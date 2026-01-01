@@ -1,6 +1,7 @@
 from base_datos import conectar
 import pandas as pd
 from datetime import datetime, timedelta
+from base_datos import inicializar_tabla
 
 
 class GestorGastos:
@@ -27,22 +28,58 @@ class GestorGastos:
                 cursor.close()
                 conexion.close()
 
-    def guardar_movimientos_tarjeta(self, nombre, corte, pago):
+    def guardar_movimientos_tarjeta(
+        self,
+        nombre,
+        corte,
+        pago,
+        limite,
+    ):
         conexion = conectar()
         if conexion:
             try:
                 cursor = conexion.cursor()
-                sql = "INSERT INTO tarjetas (nombre_tarjeta , dia_corte, dia_pago) VALUES (%s, %s, %s)"
-                valores = (nombre, corte, pago)
+                sql = "INSERT INTO tarjetas (nombre_tarjeta , dia_corte, dia_pago,limite) VALUES (%s, %s, %s,%s)"
+                valores = (nombre, corte, pago, limite)
                 cursor.execute(sql, valores)
                 conexion.commit()
                 return True
             except Exception as e:
-                print("ERROR al guardar esta tarjeta")
+                print(f"ERROR al guardar esta tarjeta: {e}")
                 return False
             finally:
                 cursor.close()
                 conexion.close()
+
+    def obtener_estado_credito(self):
+        conexion = conectar()
+        datos_estado = []
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                sql_tarjetas = "SELECT nombre_tarjeta,limite FROM tarjetas"
+                cursor.execute(sql_tarjetas)
+                tarjetas = cursor.fetchall()
+
+                for tarjeta in tarjetas:
+                    nombre = tarjeta[0]
+                    limite = float(tarjeta[1])
+
+                    sql_gasto = "SELECT SUM(monto) FROM gastos WHERE metodo_pago = %s AND tipo = 'GASTO'"
+                    cursor.execute(sql_gasto, (nombre,))
+                    resultado = cursor.fetchone()
+
+                    gasto_actual = float(resultado[0]) if resultado[0] else 0.0
+
+                    datos_estado.append((nombre, gasto_actual, limite))
+
+            except Exception as e:
+                print(f"Error calculando crédito: {e}")
+            finally:
+                cursor.close()
+                conexion.close()
+
+        return datos_estado
 
     def obtener_gastos_por_categoria(self):
         conexion = conectar()
@@ -105,12 +142,13 @@ class GestorGastos:
         if conexion:
             try:
                 cursor = conexion.cursor()
-                sql_gastos = "TRUNCATE TABLE gastos RESTART IDENTITY CASCADE;"
+                sql_gastos = "DROP TABLE gastos CASCADE;"
                 cursor.execute(sql_gastos)
-                sql_tarjetas = "TRUNCATE TABLE tarjetas RESTART IDENTITY CASCADE;"
+                sql_tarjetas = "DROP TABLE tarjetas CASCADE;"
                 cursor.execute(sql_tarjetas)
                 conexion.commit()
-                print("Bases de datos reseteadas al 100%")
+                print("Tablas eliminadas. Se recrearán al reiniciar la app.")
+                inicializar_tabla()
                 return True
             except Exception as e:
                 print(f"Error al resetear las bases de datos. {e}")
@@ -246,49 +284,34 @@ class GestorGastos:
 
         return lista_gastos
 
-    def actualizar_gastos(
-        self, id_gasto, nueva_cat, nuevo_concepto, nuevo_monto, nuevo_metodo
+    def obtener_gasto_por_id(
+        self,
+        id_gasto,
     ):
         conexion = conectar()
+        dato = None
+        cursor = None
         if conexion:
             try:
                 cursor = conexion.cursor()
-
-                sql = """
-                    UPDATE gastos
-                    set categoria = %s, concepto = %s, monto = %s, tipo = %s, metodo_pago = %s
-                    WHERE id = %s
-                    """
-                valores = (nueva_cat, nuevo_concepto, nuevo_monto, nuevo_metodo)
-
-                cursor.execute(sql, valores)
-                conexion.commit()
-                print(f"Registro {id_gasto} actualizado con exito")
-                return True
-            except Exception as e:
-                print(f"Error al actualizar el registro {id_gasto}: {e}")
-            finally:
-                cursor.closer()
-                conexion.close()
-
-    def obtener_gasto_por_id(self, id_gasto):
-        conexion = conectar()
-        dato = None
-        if conexion:
-            try:
-                cursor = conectar.cursor()
-                sql = "FROM categoria, concepto, monto,tipo,metodo_pago FROM gastos WHERE id = %s"
-                cursor.executes(sql, (id_gasto))
+                sql = "SELECT categoria, concepto, monto,metodo_pago FROM gastos WHERE id = %s"
+                cursor.execute(sql, (id_gasto,))
                 dato = cursor.fetchone()
             except Exception as e:
-                print(f"ERROR al obtner el gasto ")
+                print(f"ERROR al obtener el gasto {e}")
             finally:
-                cursor.close()
+                if cursor:
+                    cursor.close()
                 conexion.close()
         return dato
 
     def actualizar_gasto(
-        self, id_gasto, nueva_cat, nuevo_concepto, nuevo_monto, metodo_pago
+        self,
+        id_gasto,
+        nueva_cat,
+        nuevo_concepto,
+        nuevo_monto,
+        metodo_pago,
     ):
         conexion = conectar()
         if conexion:
@@ -297,7 +320,7 @@ class GestorGastos:
                 sql = """
                     UPDATE gastos
                     SET categoria=%s, concepto=%s, monto=%s, metodo_pago=%s
-                    WHERE id_gasto = %s
+                    WHERE id = %s
                     """
                 valores = (
                     nueva_cat,
@@ -312,6 +335,23 @@ class GestorGastos:
                 return True
             except Exception as e:
                 print(f"Error al actualizar el gasto {id_gasto}: {e}")
+                return False
+            finally:
+                cursor.close()
+                conexion.close()
+
+    def eliminar_gasto(self, id_gasto):
+        conexion = conectar()
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                sql = "DELETE FROM gastos WHERE id = %s"
+                cursor.execute(sql, (id_gasto,))
+                conexion.commit()
+                print(f"Gasto {id_gasto} eliminado")
+                return True
+            except Exception as e:
+                print(f"Error al eliminar gasto: {e}")
                 return False
             finally:
                 cursor.close()

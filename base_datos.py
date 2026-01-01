@@ -34,7 +34,9 @@ def inicializar_tabla():
             fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             categoria VARCHAR(50),
             concepto TEXT,
-            monto DECIMAL(10, 2)
+            monto DECIMAL(10, 2),
+            tipo VARCHAR(20),
+            metodo_pago VARCHAR (50)
         );
         """
         cursor.execute(sql_crear_tabla)
@@ -44,7 +46,8 @@ def inicializar_tabla():
             id SERIAL PRIMARY KEY,
             nombre_tarjeta VARCHAR(50) UNIQUE,
             dia_corte INTEGER,
-            dia_pago INTEGER
+            dia_pago INTEGER,
+            limite DECIMAL(10, 2)
         );
         """
 

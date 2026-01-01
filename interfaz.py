@@ -195,7 +195,7 @@ class AppGastos(ctk.CTk):
     def abrir_ventana_tarjetas(self):
         ventana_t = ctk.CTkToplevel(self)
         ventana_t.title("Gestionar Tarjetas")
-        ventana_t.geometry("300x350")
+        ventana_t.geometry("300x450")
         ventana_t.transient(self)
 
         ctk.CTkLabel(
@@ -211,6 +211,11 @@ class AppGastos(ctk.CTk):
         entry_pago = ctk.CTkEntry(ventana_t, placeholder_text="Día de Pago (Ej: 25)")
         entry_pago.pack(pady=10, padx=20)
 
+        entry_limite = ctk.CTkEntry(
+            ventana_t, placeholder_text="Límite Crédito (Ej: 5000)"
+        )
+        entry_limite.pack(pady=10, padx=20)
+
         lbl_status = ctk.CTkLabel(ventana_t, text="")
         lbl_status.pack(pady=5)
 
@@ -218,10 +223,16 @@ class AppGastos(ctk.CTk):
             nom = entry_nombre.get()
             corte = entry_corte.get()
             pago = entry_pago.get()
+            limite = entry_limite.get()
 
-            if nom and corte.isdigit() and pago.isdigit():
+            if (
+                nom
+                and corte.isdigit()
+                and pago.isdigit()
+                and limite.replace(".", "", 1).isdigit()
+            ):
                 exito = self.gestor.guardar_movimientos_tarjeta(
-                    nom, int(corte), int(pago)
+                    nom, int(corte), int(pago), float(limite)
                 )
 
                 if exito:
@@ -268,27 +279,45 @@ class AppGastos(ctk.CTk):
         canvas_widget.pack(expand=True, fill="both", padx=20, pady=20)
 
     def mostrar_grafica_proyeccion(self):
-        """Muestra la Gráfica de Barras (Pagos de Tarjetas)"""
-        # 1. Limpiamos el frame izquierdo
+        """Muestra el Estado de Tarjetas (Deuda vs Límite) y Calendario de Pagos"""
+
+        # 1. Limpiamos lo que haya en la pantalla
         for widget in self.frame_izq.winfo_children():
             widget.destroy()
 
-        # 2. Pedimos los datos calculados al modelo
-        # (Asegúrate de haber agregado 'obtener_proyeccion_pagos' en modelo.py)
-        datos_proyeccion = self.gestor.obtener_proyeccion_pagos()
-
-        # 3. Título nuevo
+        # Título Principal
         ctk.CTkLabel(
-            self.frame_izq, text="Calendario de Pagos", font=("Arial", 25, "bold")
+            self.frame_izq, text="Estado de Tarjetas", font=("Arial", 25, "bold")
         ).pack(pady=10)
 
-        # 4. Llamamos al graficador de BARRAS (asegúrate de tenerlo en graficas.py)
-        canvas = self.graficador.obtener_grafica_barras(
+        datos_uso = self.gestor.obtener_estado_credito()
+
+        if datos_uso:
+            ctk.CTkLabel(
+                self.frame_izq, text="Nivel de Endeudamiento", font=("Arial", 14)
+            ).pack(pady=(10, 0))
+            canvas_uso = self.graficador.obtener_grafica_credito(
+                datos_uso, self.frame_izq
+            )
+
+            if canvas_uso:
+                canvas_uso.pack(expand=True, fill="both", padx=20, pady=10)
+        else:
+            ctk.CTkLabel(
+                self.frame_izq, text="No hay límites registrados.", text_color="gray"
+            ).pack(pady=20)
+
+        ctk.CTkLabel(self.frame_izq, text="Próximos Pagos", font=("Arial", 14)).pack(
+            pady=(10, 0)
+        )
+
+        datos_proyeccion = self.gestor.obtener_proyeccion_pagos()
+        canvas_fechas = self.graficador.obtener_grafica_barras(
             datos_proyeccion, self.frame_izq
         )
-        canvas.pack(expand=True, fill="both", padx=20, pady=20)
+        canvas_fechas.pack(expand=True, fill="both", padx=20, pady=10)
 
-        # 5. Botón para volver al inicio
+        # Botón para volver al inicio
         ctk.CTkButton(
             self.frame_izq,
             text="Volver al Balance",
@@ -309,15 +338,14 @@ class AppGastos(ctk.CTk):
             lbl_item.pack(fill="x", padx=5, pady=2)
 
     def accion_guardar(self):
-        # 1. Obtenemos datos del formulario
+        # Obtenemos datos del formulario
         tipo = self.combo_tipo.get()
         cat = self.combo_categoria.get()
         con = self.entry_concepto.get()
         metodo_bruto = self.combo_metodo.get()
         mon = self.entry_monto.get()
 
-        # 2. LÓGICA DE TARJETA:
-        # Si eligió tarjeta, queremos guardar el NOMBRE ESPECÍFICO (ej: Visa), no el genérico.
+        # LÓGICA DE TARJETA:
         metodo_final = metodo_bruto
 
         if metodo_bruto == "TARJETA DE CREDITO":
@@ -325,17 +353,17 @@ class AppGastos(ctk.CTk):
             if nombre_tarjeta and nombre_tarjeta != "Sin tarjetas":
                 metodo_final = nombre_tarjeta
 
-        # 3. Validaciones
+        # Validaciones
         if not cat or not con or not mon:
             self.lbl_mensaje.configure(text="Faltan datos", text_color="red")
             return
 
         try:
-            # 4. Guardamos usando metodo_final
+            # Guardamos usando metodo_final
             self.gestor.guardar_gastos(cat, con, float(mon), tipo, metodo_final)
             self.lbl_mensaje.configure(text="Guardado", text_color="green")
 
-            # 5. Limpiar y Actualizar
+            # Limpiar y Actualizar
             self.combo_categoria.set("comida")
             self.entry_concepto.delete(0, "end")
             self.entry_monto.delete(0, "end")
@@ -435,7 +463,7 @@ class AppGastos(ctk.CTk):
         anchos = [100, 150, 200, 100, 150, 100]
 
         for fila in datos:
-            id_gasto, fecha, cat, con, monto, metodo = fila
+            id_gasto, fecha, cat, con, monto, tipo, metodo = fila
             fecha_str = fecha.strftime("%d-%m-%Y")
 
             row = ctk.CTkFrame(self.scroll_historial, fg_color="transparent")
@@ -483,6 +511,129 @@ class AppGastos(ctk.CTk):
                 self.actualizar_grafica()
         elif opcion == "Editar":
             self.mostrar_pantalla_edicion(id_gasto)
+
+    def mostrar_pantalla_edicion(self, id_gasto):
+        datos = self.gestor.obtener_gasto_por_id(id_gasto)
+        if not datos:
+            return
+
+        cat_actual, con_actual, mon_actual, met_actual = datos
+
+        if hasattr(self, "frame_historial"):
+            self.frame_historial.pack_forget()
+
+        if hasattr(self, "frame_edicion"):
+            self.frame_edicion.destroy()
+
+        self.frame_edicion = ctk.CTkFrame(self)
+        self.frame_edicion.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # Título y Botón Volver
+        header = ctk.CTkFrame(self.frame_edicion, fg_color="transparent")
+        header.pack(fill="x", pady=(0, 20))
+
+        ctk.CTkButton(
+            header,
+            text="⬅ Cancelar",
+            command=self.cerrar_pantalla_edicion,
+            width=100,
+            fg_color="#444444",
+        ).pack(side="left")
+
+        ctk.CTkLabel(
+            header, text=f"Editando Movimiento #{id_gasto}", font=("Arial", 25, "bold")
+        ).pack(side="left", padx=20)
+
+        # CAMPOS (Centrados para que se vea bonito)
+        panel_central = ctk.CTkFrame(self.frame_edicion, fg_color="transparent")
+        panel_central.pack()
+
+        # Categoría
+        ctk.CTkLabel(panel_central, text="Categoría:", anchor="w").pack(fill="x")
+        combo_cat = ctk.CTkComboBox(
+            panel_central,
+            width=300,
+            values=[
+                "Comida",
+                "Transporte",
+                "Servicios",
+                "Entretenimiento",
+                "Salud",
+                "Educación",
+                "Ropa",
+                "Ahorro",
+                "Sueldo",
+                "Otros",
+            ],
+        )
+        combo_cat.set(cat_actual)
+        combo_cat.pack(pady=(0, 10))
+
+        # Concepto
+        ctk.CTkLabel(panel_central, text="Concepto:", anchor="w").pack(fill="x")
+        entry_con = ctk.CTkEntry(panel_central, width=300)
+        entry_con.insert(0, con_actual)
+        entry_con.pack(pady=(0, 10))
+
+        # Monto
+        ctk.CTkLabel(panel_central, text="Monto:", anchor="w").pack(fill="x")
+        entry_mon = ctk.CTkEntry(panel_central, width=300)
+        entry_mon.insert(0, str(mon_actual))
+        entry_mon.pack(pady=(0, 10))
+
+        # Método
+        ctk.CTkLabel(panel_central, text="Método:", anchor="w").pack(fill="x")
+        combo_met = ctk.CTkComboBox(
+            panel_central,
+            width=300,
+            values=["EFECTIVO", "TARJETA DE CREDITO", "DEBITO"],
+        )
+        combo_met.set(met_actual)
+        combo_met.pack(pady=(0, 20))
+
+        # BOTÓN GUARDAR
+        ctk.CTkButton(
+            panel_central,
+            text="💾 Guardar Cambios",
+            width=300,
+            height=40,
+            fg_color="#2cc985",  # Verde éxito
+            command=lambda: self.guardar_edicion_integrada(
+                id_gasto, combo_cat, entry_con, entry_mon, combo_met
+            ),
+        ).pack()
+
+    def cerrar_pantalla_edicion(self):
+        if hasattr(self, "frame_edicion"):
+            self.frame_edicion.destroy()
+
+        self.mostrar_pantalla_historial()
+
+    def guardar_edicion_integrada(self, id_gasto, w_cat, w_con, w_mon, w_met):
+        try:
+            monto = float(w_mon.get())
+        except ValueError:
+            messagebox.showerror("ERROR", "El monto debe ser un numero")
+            return
+
+        nuevo_cat = w_cat.get()
+        nuevo_con = w_con.get()
+        nuevo_met = w_met.get()
+
+        if not nuevo_con:
+            messagebox.showerror("ERROR", "El concepto es obligatorio")
+            return
+
+        exito = self.gestor.actualizar_gasto(
+            id_gasto, nuevo_cat, nuevo_con, monto, nuevo_met
+        )
+
+        if exito:
+            messagebox.showinfo("Exito", "Registro actualizado")
+            self.cerrar_pantalla_edicion()
+
+        else:
+            messagebox.showerror("ERROR", "No se pudo guardar")
 
 
 if __name__ == "__main__":

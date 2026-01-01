@@ -72,3 +72,49 @@ class Graficador:
         canvas = FigureCanvasTkAgg(fig, master=frame_padre)
         canvas.draw()
         return canvas.get_tk_widget()
+
+    def obtener_grafica_credito(self, datos, frame_padre):
+        if not datos:
+            return None
+
+        nombres = [d[0] for d in datos]
+        gastado = [d[1] for d in datos]
+        limites = [d[2] for d in datos]
+
+        fig = Figure(figsize=(5, 3), dpi=80)
+        ax = fig.add_subplot(111)
+
+        fig.patch.set_facecolor("#242424")
+        ax.set_facecolor("#242424")
+
+        y_pos = range(len(nombres))
+
+        ax.barh(y_pos, limites, color="#444444", label="Límite Disponible")
+
+        colores_gasto = []
+        for g, l in zip(gastado, limites):
+            porcentaje = g / l if l > 0 else 0
+            if porcentaje > 0.8:
+                colores_gasto.append("#ff5555")  # Rojo (Peligro)
+            elif porcentaje > 0.5:
+                colores_gasto.append("#f1c40f")  # Amarillo (Cuidado)
+            else:
+                colores_gasto.append("#2cc985")  # Verde (Bien)
+
+        ax.barh(y_pos, gastado, color=colores_gasto, label="Deuda Actual")
+
+        # Estética
+        ax.set_yticks(y_pos)
+        ax.set_yticklabels(nombres, color="white")
+        ax.tick_params(axis="x", colors="white")
+        ax.set_title("Uso de Límites de Crédito", color="white")
+
+        # Eliminar bordes
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+        ax.spines["bottom"].set_color("white")
+        ax.spines["left"].set_visible(False)
+
+        canvas = FigureCanvasTkAgg(fig, master=frame_padre)
+        canvas.draw()
+        return canvas.get_tk_widget()
