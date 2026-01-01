@@ -173,7 +173,6 @@ class GestorGastos:
                 conexion.close()
         return None
 
-    # ESTA ES LA FUNCIÓN QUE TE FALTA EN MODELO.PY
     def obtener_proyeccion_pagos(self):
         conexion = conectar()
         proyecciones = {}
@@ -181,10 +180,8 @@ class GestorGastos:
         if conexion:
             try:
                 cursor = conexion.cursor()
-                # 1. Traemos fecha, monto y el nombre de la tarjeta (metodo_pago)
-                sql = (
-                    "SELECT fecha, monto, metodo_pago FROM gastos WHERE tipo = 'GASTO'"
-                )
+
+                sql = "SELECT fecha, monto, metodo_pago FROM gastos WHERE tipo='GASTO'"
                 cursor.execute(sql)
                 gastos = cursor.fetchall()
 
@@ -193,50 +190,31 @@ class GestorGastos:
                     monto = float(gasto[1])
                     nombre_tarjeta = gasto[2]
 
-                    # 2. Usamos la función que YA tienes: obtener_datos_tarjeta
                     reglas = self.obtener_datos_tarjeta(nombre_tarjeta)
 
                     if reglas:
                         dia_corte = reglas[0]
                         dia_pago = reglas[1]
+                        try:
+                            fecha_pago_estimada = fecha_compra.replace(day=dia_pago)
+                        except ValueError:
+                            fecha_pago_estimada = fecha_compra.replace(day=28)
 
-                        # --- CÁLCULO DE FECHAS ---
-                        # Creamos fecha tentativa con el día de pago de este mes
-                        fecha_pago_estimada = fecha_compra.replace(day=dia_pago)
-
-                        # Si compré DESPUÉS del corte, pago el otro mes
                         if fecha_compra.day > dia_corte:
-                            fecha_pago_estimada = fecha_pago_estimada + timedelta(
-                                days=30
-                            )
-                            # Ajustar al día exacto
+                            fecha_pago_estimada = fecha_compra + timedelta(days=30)
                             try:
-                                fecha_pago_estimada = fecha_pago_estimada.replace(
-                                    day=dia_pago
-                                )
+                                fecha_pago_estimada = fecha_compra.replace(day=dia_pago)
                             except ValueError:
-                                # Caso especial: Febrero o meses de 30 días
-                                # Si el día de pago es 31 y el mes no tiene, pasamos al 1 del sig mes
-                                fecha_pago_estimada = fecha_pago_estimada + timedelta(
-                                    days=1
-                                )
-                                fecha_pago_estimada = fecha_pago_estimada.replace(day=1)
+                                fecha_pago_estimada = fecha_compra + timedelta(days=28)
 
-                        # Si la fecha estimada ya pasó, sumamos un mes
                         if fecha_pago_estimada < fecha_compra:
-                            fecha_pago_estimada = fecha_pago_estimada + timedelta(
-                                days=30
-                            )
+                            fecha_pago_estimada = fecha_compra + timedelta(days=30)
                             try:
-                                fecha_pago_estimada = fecha_pago_estimada.replace(
-                                    day=dia_pago
-                                )
+                                fecha_pago_estimada = fecha_compra.replace(day=dia_pago)
                             except:
-                                fecha_pago_estimada = fecha_pago_estimada.replace(
-                                    day=28
-                                )  # Parche simple
+                                pass
 
-                        clave_fecha = fecha_pago_estimada.strftime("%Y-%m-%d")
+                        clave_fecha = fecha_pago_estimada.strftime("%y-%m-%d")
 
                         if clave_fecha in proyecciones:
                             proyecciones[clave_fecha] += monto
@@ -244,8 +222,97 @@ class GestorGastos:
                             proyecciones[clave_fecha] = monto
 
             except Exception as e:
-                print(f"Error calculando proyecciones: {e}")
+                print(f"ERROR en el calculo de proyecciones: {e}")
             finally:
                 conexion.close()
 
         return list(proyecciones.items())
+
+    def obtener_todos_los_gastos(self):
+        conexion = conectar()
+        lista_gastos = []
+
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                sql = "SELECT id, fecha, categoria,concepto,monto,tipo,metodo_pago FROM gastos ORDER BY fecha DESC"
+                cursor.execute(sql)
+                lista_gastos = cursor.fetchall()
+            except Exception as e:
+                print(f"ERROR al obtener datos de los gastos: {e}")
+            finally:
+                cursor.close()
+                conexion.close()
+
+        return lista_gastos
+
+    def actualizar_gastos(
+        self, id_gasto, nueva_cat, nuevo_concepto, nuevo_monto, nuevo_metodo
+    ):
+        conexion = conectar()
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+
+                sql = """
+                    UPDATE gastos
+                    set categoria = %s, concepto = %s, monto = %s, tipo = %s, metodo_pago = %s
+                    WHERE id = %s
+                    """
+                valores = (nueva_cat, nuevo_concepto, nuevo_monto, nuevo_metodo)
+
+                cursor.execute(sql, valores)
+                conexion.commit()
+                print(f"Registro {id_gasto} actualizado con exito")
+                return True
+            except Exception as e:
+                print(f"Error al actualizar el registro {id_gasto}: {e}")
+            finally:
+                cursor.closer()
+                conexion.close()
+
+    def obtener_gasto_por_id(self, id_gasto):
+        conexion = conectar()
+        dato = None
+        if conexion:
+            try:
+                cursor = conectar.cursor()
+                sql = "FROM categoria, concepto, monto,tipo,metodo_pago FROM gastos WHERE id = %s"
+                cursor.executes(sql, (id_gasto))
+                dato = cursor.fetchone()
+            except Exception as e:
+                print(f"ERROR al obtner el gasto ")
+            finally:
+                cursor.close()
+                conexion.close()
+        return dato
+
+    def actualizar_gasto(
+        self, id_gasto, nueva_cat, nuevo_concepto, nuevo_monto, metodo_pago
+    ):
+        conexion = conectar()
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                sql = """
+                    UPDATE gastos
+                    SET categoria=%s, concepto=%s, monto=%s, metodo_pago=%s
+                    WHERE id_gasto = %s
+                    """
+                valores = (
+                    nueva_cat,
+                    nuevo_concepto,
+                    nuevo_monto,
+                    metodo_pago,
+                    id_gasto,
+                )
+                cursor.execute(sql, valores)
+                conexion.commit()
+                print(f"Gasto {id_gasto} actualizado exitosamente")
+                return True
+            except Exception as e:
+                print(f"Error al actualizar el gasto {id_gasto}: {e}")
+                return False
+            finally:
+                cursor.close()
+                conexion.close()

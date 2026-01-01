@@ -39,25 +39,25 @@ class Graficador:
         return canvas.get_tk_widget()
 
     def obtener_grafica_barras(self, datos, frame_padre):
-        # 1. Convertir datos a DataFrame
+        # Convertir datos a DataFrame
         if not datos:
             df = pd.DataFrame({"fecha": ["Sin Deudas"], "monto": [0]})
         else:
             df = pd.DataFrame(datos, columns=["fecha", "monto"])
             df = df.sort_values("fecha")
 
-        # 2. Crear Figura
+        # Crear Figura
         fig = Figure(figsize=(4, 3), dpi=80)
         ax = fig.add_subplot(111)
 
-        # 3. Estilo Oscuro
+        # Estilo Oscuro
         fig.patch.set_facecolor("#242424")
         ax.set_facecolor("#242424")
 
-        # 4. Dibujar Barras
+        # Dibujar Barras
         ax.bar(df["fecha"], df["monto"], color="#1f6aa5")
 
-        # 5. Etiquetas
+        # Etiquetas
         ax.set_title("Proyección de Pagos (Tarjetas)", color="white", fontsize=10)
         ax.tick_params(axis="x", colors="white", rotation=45)
         ax.tick_params(axis="y", colors="white")
@@ -68,7 +68,7 @@ class Graficador:
         ax.spines["bottom"].set_color("white")
         ax.spines["left"].set_color("white")
 
-        # 6. Empaquetar para Tkinter
+        # Empaquetar para Tkinter
         canvas = FigureCanvasTkAgg(fig, master=frame_padre)
         canvas.draw()
         return canvas.get_tk_widget()

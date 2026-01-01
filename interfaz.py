@@ -12,26 +12,32 @@ class AppGastos(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        # 1. CONFIGURACIÓN BÁSICA
+        # CONFIGURACIÓN BÁSICA
         self.title("Sistema de Finanzas Personales")
         self.geometry("900x750")
 
-        # 2. INSTANCIAS DE LÓGICA
+        # INSTANCIAS DE LÓGICA
         self.gestor = GestorGastos()
         self.graficador = Graficador()
 
-        # 3. CREACIÓN DE LOS CONTENEDORES (FRAMES)
+        # CREACIÓN DE LOS CONTENEDORES (FRAMES)
         self.frame_izq = ctk.CTkFrame(self)
         self.frame_izq.pack(side="left", fill="both", expand=True, padx=10, pady=50)
 
         self.frame_der = ctk.CTkFrame(self, width=350)
         self.frame_der.pack(side="right", fill="y", padx=10, pady=10)
 
-        # 4. CREACIÓN DEL MENÚ DE OPCIONES
+        # CREACIÓN DEL MENÚ DE OPCIONES
         # (IMPORTANTE: Crear esto ANTES de llamar a crear_formulario)
         self.menu_opciones = ctk.CTkOptionMenu(
             self,
-            values=["Gestionar Tarjetas", "Exportar a Excel", "Reset", "Salir"],
+            values=[
+                "Gestionar Tarjetas",
+                "Ver Historial",
+                "Exportar a Excel",
+                "Reset",
+                "Salir",
+            ],
             command=self.evento_menu,
             width=110,
             height=30,
@@ -44,7 +50,7 @@ class AppGastos(ctk.CTk):
         self.menu_opciones.set(" Menú")
         self.menu_opciones.place(relx=0.58, y=10, anchor="n")
 
-        # 5. NUEVO BOTÓN: PROYECCIÓN DE PAGOS
+        # BOTÓN: PROYECCIÓN DE PAGOS
         # Este botón cambia la gráfica para ver las fechas de pago
         self.btn_proyeccion = ctk.CTkButton(
             self,
@@ -56,7 +62,7 @@ class AppGastos(ctk.CTk):
         )
         self.btn_proyeccion.place(relx=0.40, y=10, anchor="n")
 
-        # 6. LLAMAR A LAS FUNCIONES DE DIBUJO
+        # LLAMAR A LAS FUNCIONES DE DIBUJO
         # Ahora sí podemos crear el formulario porque el menú ya existe
         self.crear_formulario()
         self.actualizar_grafica()
@@ -64,11 +70,12 @@ class AppGastos(ctk.CTk):
     def evento_menu(self, opcion_seleccionada):
         if opcion_seleccionada == "Gestionar Tarjetas":
             self.abrir_ventana_tarjetas()
-            self.menu_opciones.set(" Menú")
+
+        elif opcion_seleccionada == "Ver Historial":
+            self.mostrar_pantalla_historial()
 
         elif opcion_seleccionada == "Salir":
             self.destroy()
-            # ¡OJO! No hacemos .set() aquí porque la ventana ya se cerró
 
         elif opcion_seleccionada == "Reset":
             respuesta = messagebox.askyesno(
@@ -79,7 +86,6 @@ class AppGastos(ctk.CTk):
                 self.gestor.resetear_base_datos()
                 self.actualizar_grafica()
                 messagebox.showinfo("Listo", "Su sistema ha sido formateado")
-            self.menu_opciones.set(" Menú")
 
         elif opcion_seleccionada == "Exportar a Excel":
             # CORRECCIÓN: Usamos asksaveasfilename para obtener solo la ruta texto
@@ -96,6 +102,10 @@ class AppGastos(ctk.CTk):
                 else:
                     messagebox.showerror("Error", "No se pudo guardar el reporte")
             self.menu_opciones.set(" Menú")
+            pass
+
+            if opcion_seleccionada != "Salir":
+                self.menu_opciones.set(" Menú")
 
     def crear_formulario(self):
         self.titulo = ctk.CTkLabel(
@@ -356,6 +366,123 @@ class AppGastos(ctk.CTk):
                 )
         else:
             self.combo_tarjetas_especificas.pack_forget()
+
+    def mostrar_pantalla_historial(self):
+        self.frame_izq.pack_forget()
+        self.frame_der.pack_forget()
+        self.btn_proyeccion.place_forget()
+        self.menu_opciones.place_forget()
+
+        if not hasattr(self, "frame_historial"):
+            self.frame_historial = ctk.CTkFrame(self)
+
+            # CABECERA
+            frame_top = ctk.CTkFrame(self.frame_historial, fg_color="transparent")
+            frame_top.pack(fill="x", padx=20, pady=10)
+
+            ctk.CTkButton(
+                frame_top,
+                text="⬅ Volver",
+                command=self.cerrar_pantalla_historial,
+                width=100,
+                fg_color="#444444",
+            ).pack(side="left")
+
+            ctk.CTkLabel(
+                frame_top, text="Historial Completo", font=("Arial", 25, "bold")
+            ).pack(side="left", padx=20)
+
+            # ENCABEZADOS TABLA
+            self.frame_headers = ctk.CTkFrame(
+                self.frame_historial, fg_color="#333333", height=40
+            )
+            self.frame_headers.pack(fill="x", padx=20, pady=(10, 0))
+
+            titulos = ["Fecha", "Categoría", "Concepto", "Monto", "Método", "Acción"]
+            anchos = [100, 150, 200, 100, 150, 100]
+
+            for i, txt in enumerate(titulos):
+                ctk.CTkLabel(
+                    self.frame_headers,
+                    text=txt,
+                    font=("Arial", 14, "bold"),
+                    width=anchos[i],
+                    anchor="w",
+                ).pack(side="left", padx=5)
+
+            # SCROLL
+            self.scroll_historial = ctk.CTkScrollableFrame(self.frame_historial)
+            self.scroll_historial.pack(fill="both", expand=True, padx=20, pady=10)
+
+        self.frame_historial.pack(fill="both", expand=True)
+        self.cargar_filas_historial()
+
+    def cerrar_pantalla_historial(self):
+        if hasattr(self, "frame_historial"):
+            self.frame_historial.pack_forget()
+
+        self.frame_izq.pack(side="left", fill="both", expand=True, padx=10, pady=50)
+        self.frame_der.pack(side="right", fill="y", padx=10, pady=10)
+        self.btn_proyeccion.place(relx=0.40, y=10, anchor="n")
+        self.menu_opciones.place(relx=0.58, y=10, anchor="n")
+        self.actualizar_grafica()
+
+    def cargar_filas_historial(self):
+        for widget in self.scroll_historial.winfo_children():
+            widget.destroy()
+
+        datos = self.gestor.obtener_todos_los_gastos()
+        anchos = [100, 150, 200, 100, 150, 100]
+
+        for fila in datos:
+            id_gasto, fecha, cat, con, monto, metodo = fila
+            fecha_str = fecha.strftime("%d-%m-%Y")
+
+            row = ctk.CTkFrame(self.scroll_historial, fg_color="transparent")
+            row.pack(fill="x", pady=2)
+
+            ctk.CTkLabel(row, text=fecha_str, width=anchos[0], anchor="w").pack(
+                side="left", padx=5
+            )
+            ctk.CTkLabel(row, text=cat, width=anchos[1], anchor="w").pack(
+                side="left", padx=5
+            )
+            ctk.CTkLabel(row, text=con, width=anchos[2], anchor="w").pack(
+                side="left", padx=5
+            )
+
+            color = "#2cc985" if cat in ["Sueldo", "Ahorro", "INGRESO"] else "white"
+            ctk.CTkLabel(
+                row,
+                text=f"Q{monto:,.2f}",
+                width=anchos[3],
+                text_color=color,
+                anchor="w",
+            ).pack(side="left", padx=5)
+
+            ctk.CTkLabel(row, text=metodo, width=anchos[4], anchor="w").pack(
+                side="left", padx=5
+            )
+
+            menu = ctk.CTkOptionMenu(
+                row,
+                values=["Editar", "Eliminar"],
+                width=anchos[5],
+                height=25,
+                fg_color="#333333",
+                command=lambda op, id_ref=id_gasto: self.accion_historial(op, id_ref),
+            )
+            menu.set("⋮")
+            menu.pack(side="left", padx=5)
+
+    def accion_historial(self, opcion, id_gasto):
+        if opcion == "Eliminar":
+            if messagebox.askyesno("Confirmar", "¿Borrar este registro?"):
+                self.gestor.eliminar_gasto(id_gasto)
+                self.cargar_filas_historial()
+                self.actualizar_grafica()
+        elif opcion == "Editar":
+            self.mostrar_pantalla_edicion(id_gasto)
 
 
 if __name__ == "__main__":
