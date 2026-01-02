@@ -108,27 +108,40 @@ class GestorGastos:
         if conexion:
             try:
                 cursor = conexion.cursor()
-                sql = """SELECT tipo, SUM(monto)
+                sql_tarjetas = "SELECT nombre_tarjeta FROM tarjetas"
+                cursor.execute(sql_tarjetas)
+                lista_credito = [fila[0] for fila in cursor.fetchall()]
+                lista_credito.append("TARJETA DE CREDITO")
+
+                sql = """SELECT tipo, metodo_pago, SUM(monto)
                         FROM gastos
-                        GROUP BY tipo"""
+                        GROUP BY tipo, metodo_pago"""
 
                 cursor.execute(sql)
                 datos = cursor.fetchall()
 
-                totales = {"INGRESO": 0, "GASTO": 0, "AHORROS": 0}
+                total_salida_liquidas = 0
+                total_ingresos = 0
 
                 for fila in datos:
-                    nombre_tipo = fila[0]
-                    suma = fila[1]
+                    tipo = fila[0]
+                    metodo = fila[1]
+                    monto = float(fila[2])
 
-                    if nombre_tipo in totales:
-                        totales[nombre_tipo] = suma
+                    if tipo == "INGRESO":
+                        total_ingresos += monto
 
-                balance_final = totales["INGRESO"] - (
-                    totales["GASTO"] + totales["AHORROS"]
-                )
+                    elif tipo == "AHORROS":
+                        total_salida_liquidas += monto
+
+                    elif tipo == "GASTO":
+                        if metodo not in lista_credito:
+                            total_salida_liquidas += monto
+
+                balance_final = total_ingresos - total_salida_liquidas
+
             except Exception as e:
-                print(f"Error al calcular su balance: {e}")
+                print(f"ERROR al calcular balance: {e}")
 
             finally:
                 cursor.close()
@@ -252,7 +265,7 @@ class GestorGastos:
                             except:
                                 pass
 
-                        clave_fecha = fecha_pago_estimada.strftime("%y-%m-%d")
+                        clave_fecha = fecha_pago_estimada.strftime("%Y-%m-%d")
 
                         if clave_fecha in proyecciones:
                             proyecciones[clave_fecha] += monto

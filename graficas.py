@@ -89,7 +89,7 @@ class Graficador:
 
         x_pos = range(len(nombres))
 
-        ax.barh(x_pos, limites, color="#444444", label="Límite Disponible", width=0.4)
+        ax.bar(x_pos, limites, color="#444444", label="Límite Disponible", width=0.4)
 
         colores_gasto = []
         for g, l in zip(gastado, limites):
@@ -101,7 +101,7 @@ class Graficador:
             else:
                 colores_gasto.append("#2cc985")  # Verde (Bien)
 
-        ax.barh(x_pos, gastado, color=colores_gasto, label="Deuda Actual")
+        ax.bar(x_pos, gastado, color=colores_gasto, label="Deuda Actual", width=0.4)
 
         # Estética
         ax.set_yticks(x_pos)
