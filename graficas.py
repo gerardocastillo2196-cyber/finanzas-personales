@@ -81,15 +81,15 @@ class Graficador:
         gastado = [d[1] for d in datos]
         limites = [d[2] for d in datos]
 
-        fig = Figure(figsize=(5, 3), dpi=80)
+        fig = Figure(figsize=(4, 2.5), dpi=80)
         ax = fig.add_subplot(111)
 
         fig.patch.set_facecolor("#242424")
         ax.set_facecolor("#242424")
 
-        y_pos = range(len(nombres))
+        x_pos = range(len(nombres))
 
-        ax.barh(y_pos, limites, color="#444444", label="Límite Disponible")
+        ax.barh(x_pos, limites, color="#444444", label="Límite Disponible", width=0.4)
 
         colores_gasto = []
         for g, l in zip(gastado, limites):
@@ -101,13 +101,12 @@ class Graficador:
             else:
                 colores_gasto.append("#2cc985")  # Verde (Bien)
 
-        ax.barh(y_pos, gastado, color=colores_gasto, label="Deuda Actual")
+        ax.barh(x_pos, gastado, color=colores_gasto, label="Deuda Actual")
 
         # Estética
-        ax.set_yticks(y_pos)
+        ax.set_yticks(x_pos)
         ax.set_yticklabels(nombres, color="white")
-        ax.tick_params(axis="x", colors="white")
-        ax.set_title("Uso de Límites de Crédito", color="white")
+        ax.tick_params(axis="y", colors="white", labelsize=8)
 
         # Eliminar bordes
         ax.spines["top"].set_visible(False)

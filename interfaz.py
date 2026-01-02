@@ -279,52 +279,98 @@ class AppGastos(ctk.CTk):
         canvas_widget.pack(expand=True, fill="both", padx=20, pady=20)
 
     def mostrar_grafica_proyeccion(self):
-        """Muestra el Estado de Tarjetas (Deuda vs Límite) y Calendario de Pagos"""
-
-        # 1. Limpiamos lo que haya en la pantalla
+        # Limpieza
         for widget in self.frame_izq.winfo_children():
             widget.destroy()
 
-        # Título Principal
+        header_frame = ctk.CTkFrame(self.frame_izq, fg_color="transparent")
+        header_frame.pack(fill="x", pady=(10, 20))
+
+        btn_volver = ctk.CTkButton(
+            header_frame,
+            text="⬅ Volver",
+            width=80,
+            height=25,
+            fg_color="#444444",
+            command=self.actualizar_grafica,
+        )
+        btn_volver.pack(side="left", padx=(0, 15))
+
         ctk.CTkLabel(
-            self.frame_izq, text="Estado de Tarjetas", font=("Arial", 25, "bold")
-        ).pack(pady=10)
+            header_frame, text="Estado de Crédito", font=("Arial", 22, "bold")
+        ).pack(side="left")
 
         datos_uso = self.gestor.obtener_estado_credito()
 
         if datos_uso:
-            ctk.CTkLabel(
-                self.frame_izq, text="Nivel de Endeudamiento", font=("Arial", 14)
-            ).pack(pady=(10, 0))
             canvas_uso = self.graficador.obtener_grafica_credito(
                 datos_uso, self.frame_izq
             )
-
             if canvas_uso:
-                canvas_uso.pack(expand=True, fill="both", padx=20, pady=10)
+                canvas_uso.pack(pady=10)
         else:
             ctk.CTkLabel(
-                self.frame_izq, text="No hay límites registrados.", text_color="gray"
+                self.frame_izq, text="No hay tarjetas registradas.", text_color="gray"
             ).pack(pady=20)
+        # Preparar los datos
+        # Total Deuda
+        total_deuda = 0
+        if datos_uso:
+            total_deuda = sum([d[1] for d in datos_uso])
 
-        ctk.CTkLabel(self.frame_izq, text="Próximos Pagos", font=("Arial", 14)).pack(
-            pady=(10, 0)
+        # Próximos pagos (Ordenamos la lista por fecha)
+        raw_pagos = self.gestor.obtener_proyeccion_pagos()
+        raw_pagos.sort(
+            key=lambda x: x[0]
+        )  # Ordenar por fecha (string Y-M-D funciona bien)
+
+        # Tomamos el 1ro y el 2do, o rellenamos con guiones si no hay
+        pago1 = raw_pagos[0] if len(raw_pagos) > 0 else ("--/--", 0)
+        pago2 = raw_pagos[1] if len(raw_pagos) > 1 else ("--/--", 0)
+
+        # Dibujar el Contenedor de Tarjetas
+        frame_resumen = ctk.CTkFrame(self.frame_izq, fg_color="transparent")
+        frame_resumen.pack(fill="x", pady=20, padx=10)
+
+        # Función auxiliar para dibujar una tarjeta bonita
+        def crear_card(parent, titulo, dato_grande, dato_sub, color_borde):
+            card = ctk.CTkFrame(parent, border_width=2, border_color=color_borde)
+            card.pack(side="left", expand=True, fill="both", padx=5)
+
+            ctk.CTkLabel(card, text=titulo, font=("Arial", 12), text_color="gray").pack(
+                pady=(10, 5)
+            )
+            ctk.CTkLabel(card, text=dato_grande, font=("Arial", 20, "bold")).pack()
+            ctk.CTkLabel(card, text=dato_sub, font=("Arial", 12)).pack(pady=(0, 10))
+
+        # CARD 1: Deuda Total
+        crear_card(
+            frame_resumen,
+            "DEUDA TOTAL",
+            f"Q{total_deuda:,.0f}",
+            "(Ciclo Actual)",
+            "#3a7ebf",
         )
 
-        datos_proyeccion = self.gestor.obtener_proyeccion_pagos()
-        canvas_fechas = self.graficador.obtener_grafica_barras(
-            datos_proyeccion, self.frame_izq
+        # CARD 2: Próximo Vencimiento (Urgente)
+        fecha_1_str = pago1[0]
+        crear_card(
+            frame_resumen,
+            "PRÓXIMO PAGO",
+            f"{fecha_1_str[5:]}",
+            f"Q{pago1[1]:,.2f}",
+            "#f1c40f",
         )
-        canvas_fechas.pack(expand=True, fill="both", padx=20, pady=10)
 
-        # Botón para volver al inicio
-        ctk.CTkButton(
-            self.frame_izq,
-            text="Volver al Balance",
-            command=self.actualizar_grafica,
-            fg_color="transparent",
-            border_width=1,
-        ).pack(pady=10)
+        # CARD 3: Siguiente
+        fecha_2_str = pago2[0]
+        crear_card(
+            frame_resumen,
+            "SIGUIENTE",
+            f"{fecha_2_str[5:]}",
+            f"Q{pago2[1]:,.2f}",
+            "#444444",
+        )
 
     def actualizar_lista_textual(self, datos_sql):
         for widget in self.frame_lista.winfo_children():
