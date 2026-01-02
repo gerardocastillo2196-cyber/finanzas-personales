@@ -76,6 +76,7 @@ class AppGastos(ctk.CTk):
 
         elif opcion_seleccionada == "Salir":
             self.destroy()
+            return
 
         elif opcion_seleccionada == "Reset":
             respuesta = messagebox.askyesno(
@@ -101,11 +102,9 @@ class AppGastos(ctk.CTk):
                     messagebox.showinfo("Éxito", "Reporte guardado correctamente")
                 else:
                     messagebox.showerror("Error", "No se pudo guardar el reporte")
-            self.menu_opciones.set(" Menú")
-            pass
+                pass
 
-            if opcion_seleccionada != "Salir":
-                self.menu_opciones.set(" Menú")
+        self.menu_opciones.set(" Menú")
 
     def crear_formulario(self):
         self.titulo = ctk.CTkLabel(
@@ -185,7 +184,7 @@ class AppGastos(ctk.CTk):
         self.separador = ctk.CTkLabel(
             self.frame_der, text="Desglose de categorias", text_color="white"
         )
-        self.separador.pack(pady=(0, 5))
+        self.separador.pack(pady=(0))
 
         self.frame_lista = ctk.CTkScrollableFrame(
             self.frame_der, height=200, label_text="Totales"
@@ -240,6 +239,7 @@ class AppGastos(ctk.CTk):
                     entry_nombre.delete(0, "end")
                     entry_corte.delete(0, "end")
                     entry_pago.delete(0, "end")
+                    entry_limite.delete(0, "end")
                 else:
                     lbl_status.configure(
                         text="Error al Guardar Tarjeta", text_color="red"
