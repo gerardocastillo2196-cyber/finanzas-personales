@@ -27,7 +27,6 @@ def inicializar_tabla():
     if conexion:
         cursor = conexion.cursor()
 
-        # SQL: Instrucciones para crear la tabla
         sql_crear_tabla = """
         CREATE TABLE IF NOT EXISTS gastos (
             id SERIAL PRIMARY KEY,
@@ -56,6 +55,16 @@ def inicializar_tabla():
         """
 
         cursor.execute(sql_crear_tabla_tarjetas)
+
+        sql_crear_tabla_debito = """
+        CREATE TABLE IF NOT EXISTS cuentas_debito (
+            id SERIAL PRIMARY KEY,
+            nombre_banco VARCHAR (50) UNIQUE,
+            saldo_inicial DECIMAL(10,2) DEFAULT 0
+        );
+        """
+
+        cursor.execute(sql_crear_tabla_debito)
 
         cursor.execute(sql_crear_tabla)
         conexion.commit()  # ¡Guardar cambios! Importante en BD

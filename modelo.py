@@ -28,6 +28,24 @@ class GestorGastos:
                 cursor.close()
                 conexion.close()
 
+    def guardar_cuentas_debito(self, nombre_banco, saldo):
+        conexion = conectar()
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+
+                sql = "INSERT INTO cuentas_debito (nombre_banco,saldo_inicial) VALUES (%s,%s)"
+                cursor.execute(sql, (nombre_banco, saldo))
+                conexion.commit()
+                print(f"Cuenta {nombre_banco} guardada correctamente")
+                return True
+            except Exception as e:
+                print(f"ERROR al guardar cuenta {nombre_banco}: {e}")
+                return False
+            finally:
+                cursor.close()
+                conexion.close()
+
     def guardar_movimientos_tarjeta(
         self, nombre, corte, pago, limite, deuda_inicial, interes, comision
     ):
@@ -126,16 +144,43 @@ class GestorGastos:
                 sql = """SELECT tipo || '-' || categoria, SUM(monto)
                         FROM gastos
                         GROUP BY tipo, categoria
-
                         """
                 cursor.execute(sql)
                 resultados = cursor.fetchall()
+
+                sql_bancos = """SELECT SUM(saldo_inicial)FROM cuentas_debito"""
+                cursor.execute(sql_bancos)
+                res_banco = cursor.fetchone()
+
+                saldo_bancos = (
+                    float(res_banco[0]) if (res_banco and res_banco[0]) else 0.0
+                )
+
+                if saldo_bancos > 0:
+                    resultados.append(("INGRESO-saldo_inicial", saldo_bancos))
+
             except Exception as e:
                 print("ERROR al analizar los datos")
             finally:
                 cursor.close()
                 conexion.close()
         return resultados
+
+    def obtener_cuentas_debito(self):
+        conexion = conectar()
+        lista = []
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                cursor.execute(sql="""SELECT nombre_banco FROM cuentas_debito""")
+                datos = cursor.fetchall()
+                lista = [fila[0] for fila in datos]
+            except Exception as e:
+                print(f"ERROR al obtener_cuenta: {e}")
+            finally:
+                cursor.close()
+                conexion.close()
+        return lista
 
     def calcular_balance(self):
         conexion = conectar()
@@ -144,6 +189,16 @@ class GestorGastos:
         if conexion:
             try:
                 cursor = conexion.cursor()
+
+                sql_saldo_inicial = "SELECT SUM(saldo_inicial) FROM cuentas_debito"
+                cursor.execute(sql_saldo_inicial)
+                resultado_saldo = cursor.fetchone()
+                saldo_inicial_total = (
+                    float(resultado_saldo[0])
+                    if (resultado_saldo and resultado_saldo[0])
+                    else 0.0
+                )
+
                 sql_tarjetas = "SELECT nombre_tarjeta FROM tarjetas"
                 cursor.execute(sql_tarjetas)
                 lista_credito = [fila[0] for fila in cursor.fetchall()]
@@ -157,7 +212,7 @@ class GestorGastos:
                 datos = cursor.fetchall()
 
                 total_salida_liquidas = 0
-                total_ingresos = 0
+                total_ingresos = saldo_inicial_total
 
                 for fila in datos:
                     tipo = fila[0]
@@ -202,6 +257,8 @@ class GestorGastos:
                 cursor.execute(sql_gastos)
                 sql_tarjetas = "DROP TABLE tarjetas CASCADE;"
                 cursor.execute(sql_tarjetas)
+                sql_debito = "DROP TABLE cuentas_debito CASCADE;"
+                cursor.execute(sql_debito)
                 conexion.commit()
                 print("Tablas eliminadas. Se recrearán al reiniciar la app.")
                 inicializar_tabla()
@@ -408,6 +465,23 @@ class GestorGastos:
                 return True
             except Exception as e:
                 print(f"Error al eliminar gasto: {e}")
+                return False
+            finally:
+                cursor.close()
+                conexion.close()
+
+    def eliminar_cuenta_debito(self, nombre_banco):
+        conexion = conectar()
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                sql = "DELETE FROM cuentas_debito WHERE nombre_banco = %s"
+                cursor.execute(sql, (nombre_banco,))
+                conexion.commit()
+                print(f"Cuenta  {nombre_banco} eliminada correctamente")
+                return True
+            except Exception as e:
+                print(f"ERROR al eliminar {nombre_banco}: {e}")
                 return False
             finally:
                 cursor.close()

@@ -33,6 +33,7 @@ class AppGastos(ctk.CTk):
             self,
             values=[
                 "Gestionar Tarjetas",
+                "Gestionar Débito",
                 "Ver Historial",
                 "Exportar a Excel",
                 "Reset",
@@ -70,6 +71,9 @@ class AppGastos(ctk.CTk):
     def evento_menu(self, opcion_seleccionada):
         if opcion_seleccionada == "Gestionar Tarjetas":
             self.abrir_ventana_tarjetas()
+
+        elif opcion_seleccionada == "Gestionar Débito":
+            self.abrir_ventana_debito()
 
         elif opcion_seleccionada == "Ver Historial":
             self.mostrar_pantalla_historial()
@@ -155,7 +159,7 @@ class AppGastos(ctk.CTk):
 
         self.combo_metodo = ctk.CTkComboBox(
             self.frame_der,
-            values=["EFECTIVO", "TARJETA DE CREDITO", "DEBITO"],
+            values=["EFECTIVO", "TARJETA DE CREDITO", "TARJETA DE DEBITO"],
             width=250,
         )
         self.combo_metodo.pack(pady=5, padx=20, anchor="w")
@@ -478,19 +482,25 @@ class AppGastos(ctk.CTk):
         if metodo_selecionado == "TARJETA DE CREDITO":
             nombres = self.gestor.obtener_nombre_tarjetas()
 
-            if nombres:
-                self.combo_tarjetas_especificas.configure(values=nombres)
-                self.combo_tarjetas_especificas.set(nombres[0])
-                self.combo_tarjetas_especificas.pack(
-                    pady=(5, 10), padx=10, anchor="w", after=self.combo_metodo
-                )
-            else:
-                self.lbl_mensaje.configure(
-                    text="⚠ Registra una tarjeta primero",
-                    text_color="orange",
-                )
+        elif metodo_selecionado == "TARJETA DE DEBITO":
+            nombres = self.gestor.obtener_cuentas_debito()
+            self._mostrar_combo_especifico(nombres)
+
         else:
             self.combo_tarjetas_especificas.pack_forget()
+
+    def _mostrar_combo_especifico(self, lista_nombres):
+        if lista_nombres:
+            self.combo_tarjetas_especificas.configure(values=lista_nombres)
+            self.combo_tarjetas_especificas.set(lista_nombres[0])
+            self.combo_tarjetas_especificas.pack(
+                pady=(5, 10), padx=10, anchor="w", after=self.combo_metodo
+            )
+        else:
+            self.lbl_mensaje.configure(
+                text="⚠ Registra una tarjeta primero",
+                text_color="orange",
+            )
 
     def mostrar_pantalla_historial(self):
         self.frame_izq.pack_forget()
@@ -749,6 +759,42 @@ class AppGastos(ctk.CTk):
             self.combo_tarjetas_especificas.pack_forget()
             # Reiniciamos la lógica del método por si acaso
             self.verificar_si_es_tarjeta(self.combo_metodo.get())
+
+    def abrir_ventana_debito(self):
+        ventana_d = ctk.CTkToplevel(self)
+        ventana_d.title("Cuentas de Débito")
+        ventana_d.geometry("300x250")
+
+        ctk.CTkLabel(
+            ventana_d, text="Nueva Cuenta Débito", font=("arial", 14, "bold")
+        ).pack(pady=10)
+
+        entry_banco = ctk.CTkEntry(ventana_d, placeholder_text="Banco (Ej: Banrural)")
+        entry_banco.pack(pady=5)
+
+        entry_saldo = ctk.CTkEntry(
+            ventana_d, placeholder_text="Saldo Inicial (Ej: 1000)"
+        )
+        entry_saldo.pack(pady=5)
+
+        lbl_info = ctk.CTkLabel(ventana_d, text="")
+        lbl_info.pack()
+
+        def guardar():
+            nom = entry_banco.get()
+            sal = entry_saldo.get()
+            if nom and sal.replace(".", "", 1).isdigit():
+                if self.gestor.guardar_cuentas_debito(nom, float(sal)):
+                    self.actualizar_grafica()
+                    ventana_d.destroy()
+                else:
+                    lbl_info.configure(
+                        text="Error: No se pudo guardar en la BD", text_color="red"
+                    )
+            else:
+                lbl_info.configure(text="Datos inválidos", text_color="red")
+
+        ctk.CTkButton(ventana_d, text="Guardar", command=guardar).pack(pady=10)
 
 
 if __name__ == "__main__":
