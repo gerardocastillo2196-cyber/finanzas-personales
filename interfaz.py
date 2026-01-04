@@ -102,7 +102,6 @@ class AppGastos(ctk.CTk):
                     messagebox.showinfo("Éxito", "Reporte guardado correctamente")
                 else:
                     messagebox.showerror("Error", "No se pudo guardar el reporte")
-                pass
 
         self.menu_opciones.set(" Menú")
 
@@ -117,7 +116,9 @@ class AppGastos(ctk.CTk):
         self.lbl_tipo.pack(pady=(10, 0), anchor="w", padx=20)
 
         self.combo_tipo = ctk.CTkComboBox(
-            self.frame_der, values=["GASTO", "INGRESO", "AHORROS"], width=250
+            self.frame_der,
+            values=["GASTO", "INGRESO", "RETIRO", "ABONO A TARJETA", "AHORROS"],
+            width=250,
         )
         self.combo_tipo.pack(pady=5, padx=20, anchor="w")
         self.combo_tipo.set("GASTO")
@@ -191,10 +192,12 @@ class AppGastos(ctk.CTk):
         )
         self.frame_lista.pack(fill="x", padx=10, pady=(5, 10), expand=True)
 
+        self.combo_tipo.configure(command=self.verificar_tipo_movimiento)
+
     def abrir_ventana_tarjetas(self):
         ventana_t = ctk.CTkToplevel(self)
         ventana_t.title("Gestionar Tarjetas")
-        ventana_t.geometry("300x450")
+        ventana_t.geometry("300x600")
         ventana_t.transient(self)
 
         ctk.CTkLabel(
@@ -215,23 +218,64 @@ class AppGastos(ctk.CTk):
         )
         entry_limite.pack(pady=10, padx=20)
 
+        ctk.CTkLabel(ventana_t, text="Datos Adicionales:", font=("arial", 12)).pack(
+            pady=(15, 5)
+        )
+
+        entry_deuda = ctk.CTkEntry(
+            ventana_t, placeholder_text="Deuda Actual (Ej: 1500)"
+        )
+        entry_deuda.pack(pady=5, padx=20)
+
+        entry_interes = ctk.CTkEntry(
+            ventana_t, placeholder_text="Tasa Interés Anual % (Ej: 45)"
+        )
+        entry_interes.pack(pady=5, padx=20)
+
         lbl_status = ctk.CTkLabel(ventana_t, text="")
         lbl_status.pack(pady=5)
+
+        ctk.CTkLabel(ventana_t, text="Comision por Retiro:", font=("arial", 12)).pack(
+            pady=(15, 5)
+        )
+        entry_comision = ctk.CTkEntry(
+            ventana_t, placeholder_text="Comision por Retiro (Ej.5%)"
+        )
+        entry_comision.pack(pady=5, padx=10)
 
         def guardar_tarjeta():
             nom = entry_nombre.get()
             corte = entry_corte.get()
             pago = entry_pago.get()
             limite = entry_limite.get()
+            deuda = entry_deuda.get()
+            interes = entry_interes.get()
+            comision = entry_comision.get()
+
+            if not deuda:
+                deuda = "0"
+            if not interes:
+                interes = "0"
+            if not comision:
+                comision = "0"
 
             if (
                 nom
                 and corte.isdigit()
                 and pago.isdigit()
                 and limite.replace(".", "", 1).isdigit()
+                and deuda.replace(".", "", 1).isdigit()
+                and interes.replace(".", "", 1).isdigit()
+                and comision.replace(".", "", 1).isdigit()
             ):
                 exito = self.gestor.guardar_movimientos_tarjeta(
-                    nom, int(corte), int(pago), float(limite)
+                    nom,
+                    int(corte),
+                    int(pago),
+                    float(limite),
+                    float(deuda),
+                    float(interes),
+                    float(comision),
                 )
 
                 if exito:
@@ -240,6 +284,9 @@ class AppGastos(ctk.CTk):
                     entry_corte.delete(0, "end")
                     entry_pago.delete(0, "end")
                     entry_limite.delete(0, "end")
+                    entry_deuda.delete(0, "end")
+                    entry_interes.delete(0, "end")
+                    entry_comision.delete(0, "end")
                 else:
                     lbl_status.configure(
                         text="Error al Guardar Tarjeta", text_color="red"
@@ -394,7 +441,7 @@ class AppGastos(ctk.CTk):
         # LÓGICA DE TARJETA:
         metodo_final = metodo_bruto
 
-        if metodo_bruto == "TARJETA DE CREDITO":
+        if metodo_bruto == "TARJETA DE CREDITO" or tipo == "ABONO A TARJETA":
             nombre_tarjeta = self.combo_tarjetas_especificas.get()
             if nombre_tarjeta and nombre_tarjeta != "Sin tarjetas":
                 metodo_final = nombre_tarjeta
@@ -423,8 +470,12 @@ class AppGastos(ctk.CTk):
             self.lbl_mensaje.configure(text=f"Error: {e}", text_color="red")
 
     def verificar_si_es_tarjeta(self, metodo_selecionado):
+        tipo_actual = self.combo_tipo.get()
+
+        if tipo_actual == "ABONO A TARJETA":
+            return
+
         if metodo_selecionado == "TARJETA DE CREDITO":
-            # Usamos obtener_nombre_tarjetas (singular) tal como lo tienes en tu modelo.py
             nombres = self.gestor.obtener_nombre_tarjetas()
 
             if nombres:
@@ -680,6 +731,24 @@ class AppGastos(ctk.CTk):
 
         else:
             messagebox.showerror("ERROR", "No se pudo guardar")
+
+    def verificar_tipo_movimiento(self, tipo):
+        # Si voy a pagar tarjeta, necesito ver la lista de tarjetas para elegir CUAL pagar
+        if tipo == "ABONO A TARJETA":
+            nombres = self.gestor.obtener_nombre_tarjetas()
+            self.combo_tarjetas_especificas.configure(values=nombres)
+            self.combo_tarjetas_especificas.pack(
+                pady=(5, 10), padx=10, anchor="w", after=self.combo_metodo
+            )
+            # Cambiamos la etiqueta para que se entienda
+            self.lbl_metodo.configure(text="Tarjeta Destino:")
+
+        else:
+            # Comportamiento normal
+            self.lbl_metodo.configure(text="Método de Pago:")
+            self.combo_tarjetas_especificas.pack_forget()
+            # Reiniciamos la lógica del método por si acaso
+            self.verificar_si_es_tarjeta(self.combo_metodo.get())
 
 
 if __name__ == "__main__":

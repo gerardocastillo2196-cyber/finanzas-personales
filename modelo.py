@@ -29,18 +29,22 @@ class GestorGastos:
                 conexion.close()
 
     def guardar_movimientos_tarjeta(
-        self,
-        nombre,
-        corte,
-        pago,
-        limite,
+        self, nombre, corte, pago, limite, deuda_inicial, interes, comision
     ):
         conexion = conectar()
         if conexion:
             try:
                 cursor = conexion.cursor()
-                sql = "INSERT INTO tarjetas (nombre_tarjeta , dia_corte, dia_pago,limite) VALUES (%s, %s, %s,%s)"
-                valores = (nombre, corte, pago, limite)
+                sql = "INSERT INTO tarjetas (nombre_tarjeta , dia_corte, dia_pago,limite, deuda_actual, tasa_interes,comision_retiro) VALUES (%s,%s,%s,%s,%s,%s,%s)"
+                valores = (
+                    nombre,
+                    corte,
+                    pago,
+                    limite,
+                    deuda_inicial,
+                    interes,
+                    comision,
+                )
                 cursor.execute(sql, valores)
                 conexion.commit()
                 return True
@@ -57,21 +61,53 @@ class GestorGastos:
         if conexion:
             try:
                 cursor = conexion.cursor()
-                sql_tarjetas = "SELECT nombre_tarjeta,limite FROM tarjetas"
+                sql_tarjetas = "SELECT nombre_tarjeta,limite,deuda_actual, comision_retiro FROM tarjetas"
                 cursor.execute(sql_tarjetas)
                 tarjetas = cursor.fetchall()
 
                 for tarjeta in tarjetas:
                     nombre = tarjeta[0]
                     limite = float(tarjeta[1])
+                    deuda_inicial = float(tarjeta[2])
+                    tasa_comision = float(tarjeta[3])
 
+                    # Suma Gasto
                     sql_gasto = "SELECT SUM(monto) FROM gastos WHERE metodo_pago = %s AND tipo = 'GASTO'"
                     cursor.execute(sql_gasto, (nombre,))
                     resultado = cursor.fetchone()
 
-                    gasto_actual = float(resultado[0]) if resultado[0] else 0.0
+                    total_gastos = float(resultado[0]) if resultado[0] else 0.0
 
-                    datos_estado.append((nombre, gasto_actual, limite))
+                    # Suma Retiros
+                    sql_retiro = "SELECT SUM(monto) FROM gastos WHERE metodo_pago = %s AND tipo = 'RETIRO'"
+                    cursor.execute(sql_retiro, (nombre,))
+                    res_retiro = cursor.fetchone()
+                    monto_retiros = float(res_retiro[0]) if res_retiro[0] else 0.0
+
+                    total_retiros = monto_retiros + (
+                        monto_retiros * (tasa_comision / 100)
+                    )
+
+                    # Restar Abonos
+                    sql_abono = "SELECT SUM(monto) FROM gastos WHERE metodo_pago = %s AND tipo = 'ABONO A TARJETA'"
+                    cursor.execute(sql_abono, (nombre,))
+                    res_abono = cursor.fetchone()
+                    total_abonos = float(res_abono[0]) if res_abono[0] else 0.0
+
+                    gasto_total = (
+                        deuda_inicial + total_gastos + total_retiros - total_abonos
+                    )
+
+                    datos_estado.append((nombre, gasto_total, limite))
+
+                    print(f"--- DIAGNÓSTICO PARA {nombre} ---")
+                    print(f"Base: {deuda_inicial} | Gastos: {total_gastos}")
+                    print(
+                        f"Retiros (+comisión): {total_retiros} | Pagos: {total_abonos}"
+                    )
+                    print(f"Total Final: {gasto_total}")
+                    print("-----------------------------------")
+                    print("-----------------------------------")
 
             except Exception as e:
                 print(f"Error calculando crédito: {e}")
@@ -130,6 +166,13 @@ class GestorGastos:
 
                     if tipo == "INGRESO":
                         total_ingresos += monto
+
+                    elif tipo == "RETIRO":
+                        if metodo in lista_credito:
+                            total_ingresos += monto
+
+                    elif tipo == "ABONO A TARJETA":
+                        total_salida_liquidas += monto
 
                     elif tipo == "AHORROS":
                         total_salida_liquidas += monto

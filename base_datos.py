@@ -36,7 +36,8 @@ def inicializar_tabla():
             concepto TEXT,
             monto DECIMAL(10, 2),
             tipo VARCHAR(20),
-            metodo_pago VARCHAR (50)
+            metodo_pago VARCHAR (50),
+            comision_retiro DECIMAL(5, 2)
         );
         """
         cursor.execute(sql_crear_tabla)
@@ -47,7 +48,10 @@ def inicializar_tabla():
             nombre_tarjeta VARCHAR(50) UNIQUE,
             dia_corte INTEGER,
             dia_pago INTEGER,
-            limite DECIMAL(10, 2)
+            limite DECIMAL(10, 2),
+            deuda_actual DECIMAL(10, 2) DEFAULT 0,  
+            tasa_interes DECIMAL(5, 2) DEFAULT 0,
+            comision_retiro DECIMAL(5,2) DEFAULT 0
         );
         """
 

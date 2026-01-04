@@ -81,7 +81,7 @@ class Graficador:
         gastado = [d[1] for d in datos]
         limites = [d[2] for d in datos]
 
-        fig = Figure(figsize=(4, 2.5), dpi=80)
+        fig = Figure(figsize=(4, 3), dpi=80)
         ax = fig.add_subplot(111)
 
         fig.patch.set_facecolor("#242424")
@@ -89,8 +89,10 @@ class Graficador:
 
         x_pos = range(len(nombres))
 
+        # Barra Fondo (Límite Total)
         ax.bar(x_pos, limites, color="#444444", label="Límite Disponible", width=0.4)
 
+        # Lógica de colores (Semáforo)
         colores_gasto = []
         for g, l in zip(gastado, limites):
             porcentaje = g / l if l > 0 else 0
@@ -101,7 +103,24 @@ class Graficador:
             else:
                 colores_gasto.append("#2cc985")  # Verde (Bien)
 
+        # Barra Frente (Deuda)
         ax.bar(x_pos, gastado, color=colores_gasto, label="Deuda Actual", width=0.4)
+
+        for i, (g, l) in enumerate(zip(gastado, limites)):
+            disponible = l - g
+            ax.text(
+                i,
+                l + (l * 0.02),  # Un poquito arriba del límite
+                f"Disp:\nQ{disponible:,.0f}",
+                ha="center",
+                va="bottom",
+                color="white",
+                fontsize=8,
+                fontweight="bold",
+            )
+
+        if limites:
+            ax.set_ylim(0, max(limites) * 1.3)
 
         # Estética
         ax.set_yticks(x_pos)
