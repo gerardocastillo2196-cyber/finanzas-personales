@@ -34,6 +34,7 @@ class AppGastos(ctk.CTk):
             values=[
                 "Gestionar Tarjetas",
                 "Gestionar Débito",
+                "Gestionar Ahorros",
                 "Ver Historial",
                 "Exportar a Excel",
                 "Reset",
@@ -74,6 +75,9 @@ class AppGastos(ctk.CTk):
 
         elif opcion_seleccionada == "Gestionar Débito":
             self.abrir_ventana_debito()
+
+        elif opcion_seleccionada == "Gestionar Ahorros":
+            self.abrir_ventana_ahorro()
 
         elif opcion_seleccionada == "Ver Historial":
             self.mostrar_pantalla_historial()
@@ -291,6 +295,10 @@ class AppGastos(ctk.CTk):
                     entry_deuda.delete(0, "end")
                     entry_interes.delete(0, "end")
                     entry_comision.delete(0, "end")
+
+                    messagebox.showinfo("Éxito", "Tarjeta Guardada Correctamente")
+                    ventana_t.destroy()
+
                 else:
                     lbl_status.configure(
                         text="Error al Guardar Tarjeta", text_color="red"
@@ -435,36 +443,72 @@ class AppGastos(ctk.CTk):
             lbl_item.pack(fill="x", padx=5, pady=2)
 
     def accion_guardar(self):
-        # Obtenemos datos del formulario
+        # Obtenemos lo que el usuario escribió
         tipo = self.combo_tipo.get()
+        monto_str = self.entry_monto.get()
+        metodo = self.combo_metodo.get()
+
+        # LOGICA INTELIGENTE: Rellenar datos ocultos
+
         cat = self.combo_categoria.get()
+        if not cat or tipo in ["INGRESO", "RETIRO", "ABONO A TARJETA", "AHORROS"]:
+            cat = tipo
+
         con = self.entry_concepto.get()
-        metodo_bruto = self.combo_metodo.get()
-        mon = self.entry_monto.get()
+        if tipo == "AHORROS":
+            # Inventamos un concepto automático
+            cuenta_destino = self.combo_tarjetas_especificas.get()
+            con = f"Ahorro depositado en: {cuenta_destino}"
 
-        # LÓGICA DE TARJETA:
-        metodo_final = metodo_bruto
+        elif tipo == "ABONO A TARJETA":
+            tarjeta_destino = self.combo_tarjetas_especificas.get()
+            con = f"Pago a tarjeta: {tarjeta_destino}"
 
-        if metodo_bruto == "TARJETA DE CREDITO" or tipo == "ABONO A TARJETA":
-            nombre_tarjeta = self.combo_tarjetas_especificas.get()
-            if nombre_tarjeta and nombre_tarjeta != "Sin tarjetas":
-                metodo_final = nombre_tarjeta
+        elif tipo == "RETIRO":
+            con = "Retiro de Efectivo"
 
-        # Validaciones
-        if not cat or not con or not mon:
-            self.lbl_mensaje.configure(text="Faltan datos", text_color="red")
+        # Si sigue vacío y NO es un campo oculto, entonces sí es error
+        elif not con:
+            self.lbl_mensaje.configure(text="Falta el concepto", text_color="red")
+            return
+
+        # LÓGICA DE DESTINO / MÉTODO
+        metodo_final = metodo
+
+        # Si es AHORRO o ABONO, el "Método" que guardamos es el DESTINO (Dónde va el dinero)
+        if tipo in ["ABONO A TARJETA", "AHORROS"]:
+            destino = self.combo_tarjetas_especificas.get()
+            if destino and destino != "Sin tarjetas":
+                metodo_final = destino
+
+        # Si es gasto normal con tarjeta, guardamos cuál tarjeta usó
+        elif metodo in ["TARJETA DE CREDITO", "TARJETA DE DEBITO"]:
+            especifico = self.combo_tarjetas_especificas.get()
+            if especifico:
+                metodo_final = especifico
+
+        # VALIDACIÓN DE MONTO Y GUARDADO
+        if not monto_str:
+            self.lbl_mensaje.configure(text="Falta el monto", text_color="red")
             return
 
         try:
-            # Guardamos usando metodo_final
-            self.gestor.guardar_gastos(cat, con, float(mon), tipo, metodo_final)
-            self.lbl_mensaje.configure(text="Guardado", text_color="green")
+            monto = float(monto_str)
 
-            # Limpiar y Actualizar
-            self.combo_categoria.set("comida")
-            self.entry_concepto.delete(0, "end")
-            self.entry_monto.delete(0, "end")
+            self.gestor.guardar_gastos(cat, con, monto, tipo, metodo_final)
+
+            self.lbl_mensaje.configure(
+                text="Guardado correctamente", text_color="green"
+            )
             self.actualizar_grafica()
+
+            # Limpiar campos
+            self.entry_monto.delete(0, "end")
+            self.entry_concepto.delete(0, "end")
+
+            # Si era gasto, regresamos a categoría comida por comodidad
+            if tipo == "GASTO":
+                self.combo_categoria.set("Comida")
 
         except ValueError:
             self.lbl_mensaje.configure(
@@ -743,22 +787,106 @@ class AppGastos(ctk.CTk):
             messagebox.showerror("ERROR", "No se pudo guardar")
 
     def verificar_tipo_movimiento(self, tipo):
-        # Si voy a pagar tarjeta, necesito ver la lista de tarjetas para elegir CUAL pagar
-        if tipo == "ABONO A TARJETA":
-            nombres = self.gestor.obtener_nombre_tarjetas()
-            self.combo_tarjetas_especificas.configure(values=nombres)
-            self.combo_tarjetas_especificas.pack(
-                pady=(5, 10), padx=10, anchor="w", after=self.combo_metodo
-            )
-            # Cambiamos la etiqueta para que se entienda
-            self.lbl_metodo.configure(text="Tarjeta Destino:")
+        # LIMPIEZA TOTAL: Quitamos ABSOLUTAMENTE TODO del frame derecho
+        self.combo_categoria.pack_forget()
+        self.entry_concepto.pack_forget()
+        self.lbl_metodo.pack_forget()
+        self.combo_metodo.pack_forget()
+        self.combo_tarjetas_especificas.pack_forget()
 
-        else:
-            # Comportamiento normal
+        self.entry_monto.pack_forget()
+        self.btn_guardar.pack_forget()
+        self.lbl_mensaje.pack_forget()
+        self.separador.pack_forget()
+        self.frame_lista.pack_forget()
+
+        # CAMPOS VARIABLES
+        todas_categorias = [
+            "Comida",
+            "Transporte",
+            "Servicios",
+            "Entretenimiento",
+            "Salud",
+            "Educación",
+            "Ropa",
+            "Ahorro",
+            "Sueldo",
+            "Otros",
+        ]
+
+        if tipo == "GASTO":
+            # Categoría
+            cats_gasto = [c for c in todas_categorias if c not in ["Ahorro", "Sueldo"]]
+            self.combo_categoria.configure(values=cats_gasto)
+            self.combo_categoria.set("Comida")
+            self.combo_categoria.pack(pady=10, padx=20, anchor="w")
+
+            # Concepto
+            self.entry_concepto.pack(pady=10, padx=20, anchor="w")
+
+            # Método
             self.lbl_metodo.configure(text="Método de Pago:")
-            self.combo_tarjetas_especificas.pack_forget()
-            # Reiniciamos la lógica del método por si acaso
+            self.lbl_metodo.pack(pady=(10, 0), anchor="w", padx=20)
+            self.combo_metodo.pack(pady=5, padx=20, anchor="w")
+
+            # Chequeo tarjeta
             self.verificar_si_es_tarjeta(self.combo_metodo.get())
+
+        elif tipo == "INGRESO":
+            # Concepto
+            self.entry_concepto.pack(pady=10, padx=20, anchor="w")
+
+            # Método (Destino)
+            self.lbl_metodo.configure(text="Destino (Dónde entra):")
+            self.lbl_metodo.pack(pady=(10, 0), anchor="w", padx=20)
+            self.combo_metodo.pack(pady=5, padx=20, anchor="w")
+
+            self.verificar_si_es_tarjeta(self.combo_metodo.get())
+
+        elif tipo == "RETIRO":
+            # Método (Origen)
+            self.lbl_metodo.configure(text="Origen (De dónde sacas):")
+            self.lbl_metodo.pack(pady=(10, 0), anchor="w", padx=20)
+            self.combo_metodo.pack(pady=5, padx=20, anchor="w")
+
+            self.verificar_si_es_tarjeta(self.combo_metodo.get())
+
+        elif tipo == "ABONO A TARJETA":
+            # Método (Origen)
+            self.lbl_metodo.configure(text="Origen del dinero:")
+            self.lbl_metodo.pack(pady=(10, 0), anchor="w", padx=20)
+            self.combo_metodo.pack(pady=5, padx=20, anchor="w")
+
+            # Tarjeta Destino
+            nombres = self.gestor.obtener_nombre_tarjetas()
+            if nombres:
+                self.combo_tarjetas_especificas.configure(values=nombres)
+                self.combo_tarjetas_especificas.set(nombres[0])
+                self.combo_tarjetas_especificas.pack(pady=(5, 10), padx=10, anchor="w")
+
+        elif tipo == "AHORROS":
+            # Método (Origen)
+            self.lbl_metodo.configure(text="Origen del dinero:")
+            self.lbl_metodo.pack(pady=(10, 0), anchor="w", padx=20)
+            self.combo_metodo.pack(pady=5, padx=20, anchor="w")
+
+            # Cuenta Destino
+            cuentas = self.gestor.obtener_cuenta_ahorro()
+            if cuentas:
+                self.combo_tarjetas_especificas.configure(values=cuentas)
+                self.combo_tarjetas_especificas.set(cuentas[0])
+                self.combo_tarjetas_especificas.pack(pady=(5, 10), padx=10, anchor="w")
+
+        # Monto
+        self.entry_monto.pack(pady=10, padx=20, anchor="w")
+
+        # Botón
+        self.btn_guardar.pack(pady=(30, 0))
+
+        # Mensajes y Lista
+        self.lbl_mensaje.pack(pady=5)
+        self.separador.pack(pady=(0))
+        self.frame_lista.pack(fill="x", padx=10, pady=(5, 10), expand=True)
 
     def abrir_ventana_debito(self):
         ventana_d = ctk.CTkToplevel(self)
@@ -795,6 +923,33 @@ class AppGastos(ctk.CTk):
                 lbl_info.configure(text="Datos inválidos", text_color="red")
 
         ctk.CTkButton(ventana_d, text="Guardar", command=guardar).pack(pady=10)
+
+    def abrir_ventana_ahorro(self):
+        ventana_a = ctk.CTkToplevel(self)
+        ventana_a.title("Cuenta de Ahorro")
+        ventana_a.geometry("300x250")
+
+        ctk.CTkLabel(
+            ventana_a, text="Nueva Cuenta Ahorro", font=("arial", 14, "bold")
+        ).pack(pady=10)
+
+        entry_banco = ctk.CTkEntry(ventana_a, placeholder_text="Banco/Alcancía")
+        entry_banco.pack(pady=5)
+
+        entry_saldo = ctk.CTkEntry(ventana_a, placeholder_text="Monto Actual")
+        entry_saldo.pack(pady=5)
+
+        def guardar():
+            nom = entry_banco.get()
+            sal = entry_saldo.get()
+            if nom and sal.replace(".", "", 1).isdigit():
+                if self.gestor.guardar_cuenta_ahorro(nom, float(sal)):
+                    messagebox.showinfo("Listo", "Cuenta de ahorro creada")
+                    ventana_a.destroy()
+            else:
+                messagebox.showerror("Error", "Datos inválidos")
+
+        ctk.CTkButton(ventana_a, text="Guardar", command=guardar).pack(pady=10)
 
 
 if __name__ == "__main__":

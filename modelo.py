@@ -73,6 +73,22 @@ class GestorGastos:
                 cursor.close()
                 conexion.close()
 
+    def guardar_cuenta_ahorro(self, nombre_banco, saldo):
+        conexion = conectar()
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                sql = "INSERT INTO cuentas_ahorros (nombre_banco,saldo_actual) VALUES (%s,%s)"
+                cursor.execute(sql, (nombre_banco, saldo))
+                conexion.commit()
+                return True
+            except Exception as e:
+                print(f"ERROR al guardar la cuenta de ahorros {nombre_banco}: {e}")
+                return False
+            finally:
+                cursor.close()
+                conexion.close()
+
     def obtener_estado_credito(self):
         conexion = conectar()
         datos_estado = []
@@ -166,13 +182,27 @@ class GestorGastos:
                 conexion.close()
         return resultados
 
+    def obtener_cuenta_ahorro(self):
+        conexion = conectar()
+        lista = []
+        if conexion:
+            try:
+                cursor = conexion.cursor()
+                cursor.execute("SELECT nombre_banco FROM cuentas_ahorros")
+                lista = [fila[0] for fila in cursor.fetchall()]
+            except Exception as e:
+                print(f"ERROR al obtener cuenta de ahorro: {e}")
+            finally:
+                conexion.close()
+        return lista
+
     def obtener_cuentas_debito(self):
         conexion = conectar()
         lista = []
         if conexion:
             try:
                 cursor = conexion.cursor()
-                cursor.execute(sql="""SELECT nombre_banco FROM cuentas_debito""")
+                cursor.execute("""SELECT nombre_banco FROM cuentas_debito""")
                 datos = cursor.fetchall()
                 lista = [fila[0] for fila in datos]
             except Exception as e:
@@ -199,6 +229,15 @@ class GestorGastos:
                     else 0.0
                 )
 
+                sql_ahorros = "SELECT SUM(saldo_actual) FROM cuentas_ahorros"
+                cursor.execute(sql_ahorros)
+                resultado_ahorros = cursor.fetchone()
+                saldo_ahorros = (
+                    float(resultado_ahorros[0])
+                    if (resultado_ahorros and resultado_ahorros[0])
+                    else 0.0
+                )
+
                 sql_tarjetas = "SELECT nombre_tarjeta FROM tarjetas"
                 cursor.execute(sql_tarjetas)
                 lista_credito = [fila[0] for fila in cursor.fetchall()]
@@ -212,7 +251,7 @@ class GestorGastos:
                 datos = cursor.fetchall()
 
                 total_salida_liquidas = 0
-                total_ingresos = saldo_inicial_total
+                total_ingresos = saldo_inicial_total + saldo_ahorros
 
                 for fila in datos:
                     tipo = fila[0]
@@ -259,6 +298,8 @@ class GestorGastos:
                 cursor.execute(sql_tarjetas)
                 sql_debito = "DROP TABLE cuentas_debito CASCADE;"
                 cursor.execute(sql_debito)
+                sql_ahorros = "DROP TABLE cuentas_ahorros CASCADE;"
+                cursor.execute(sql_ahorros)
                 conexion.commit()
                 print("Tablas eliminadas. Se recrearán al reiniciar la app.")
                 inicializar_tabla()

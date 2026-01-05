@@ -66,6 +66,15 @@ def inicializar_tabla():
 
         cursor.execute(sql_crear_tabla_debito)
 
+        sql_crear_tabla_ahorros = """
+        CREATE TABLE IF NOT EXISTS cuentas_ahorros (
+        id SERIAL PRIMARY KEY,
+        nombre_banco VARCHAR (50) UNIQUE,
+        saldo_actual DECIMAL(10,2) DEFAULT 0
+        );
+        """
+        cursor.execute(sql_crear_tabla_ahorros)
+
         cursor.execute(sql_crear_tabla)
         conexion.commit()  # ¡Guardar cambios! Importante en BD
         print("Tablas 'gastos' & 'Tarjetas' verificadas correctamente.")
